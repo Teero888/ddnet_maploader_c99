@@ -124,7 +124,7 @@ enum {
   MAPITEMTYPE_SOUND,
 };
 
-int GetFileDataSize(CDatafile *pDataFile, int Index) {
+int get_file_data_size(CDatafile *pDataFile, int Index) {
   if (!pDataFile) {
     return 0;
   }
@@ -137,7 +137,7 @@ int GetFileDataSize(CDatafile *pDataFile, int Index) {
          pDataFile->m_Info.m_pDataOffsets[Index];
 }
 
-void *GetData(CDatafile *pDataFile, int Index) {
+void *get_data(CDatafile *pDataFile, int Index) {
   if (!pDataFile) {
     return NULL;
   }
@@ -152,7 +152,7 @@ void *GetData(CDatafile *pDataFile, int Index) {
       return NULL;
 
     // fetch the data size
-    unsigned DataSize = GetFileDataSize(pDataFile, Index);
+    unsigned DataSize = get_file_data_size(pDataFile, Index);
 #if defined(CONF_ARCH_ENDIAN_BIG)
     unsigned SwapSize = DataSize;
 #endif
@@ -218,7 +218,7 @@ void *GetData(CDatafile *pDataFile, int Index) {
   return pDataFile->m_ppDataPtrs[Index];
 }
 
-void GetType(CDatafile *pDataFile, int Type, int *pStart, int *pNum) {
+void get_type(CDatafile *pDataFile, int Type, int *pStart, int *pNum) {
   *pStart = 0;
   *pNum = 0;
 
@@ -234,7 +234,7 @@ void GetType(CDatafile *pDataFile, int Type, int *pStart, int *pNum) {
   }
 }
 
-void *GetItem(CDatafile *pDataFile, int Index, int *pType, int *pId) {
+void *get_item(CDatafile *pDataFile, int Index, int *pType, int *pId) {
   if (!pDataFile) {
     if (pType)
       *pType = 0;
@@ -258,7 +258,7 @@ void *GetItem(CDatafile *pDataFile, int Index, int *pType, int *pId) {
   return (void *)(pItem + 1);
 }
 
-GameTiles LoadMap(const char *pName) {
+GameTiles load_map(const char *pName) {
   FILE *pMapFile;
   pMapFile = fopen(pName, "r");
   if (!pMapFile) {
@@ -342,21 +342,21 @@ GameTiles LoadMap(const char *pName) {
   int GroupsStart;
   int LayersNum;
   int LayersStart;
-  GetType(pTmpDataFile, MAPITEMTYPE_GROUP, &GroupsStart, &GroupsNum);
-  GetType(pTmpDataFile, MAPITEMTYPE_LAYER, &LayersStart, &LayersNum);
+  get_type(pTmpDataFile, MAPITEMTYPE_GROUP, &GroupsStart, &GroupsNum);
+  get_type(pTmpDataFile, MAPITEMTYPE_LAYER, &LayersStart, &LayersNum);
 
   GameTiles Tiles;
   for (int g = 0; g < GroupsNum; ++g) {
-    CMapItemGroup *pGroup = GetItem(pTmpDataFile, GroupsStart + g, NULL, NULL);
+    CMapItemGroup *pGroup = get_item(pTmpDataFile, GroupsStart + g, NULL, NULL);
     for (int l = 0; l < pGroup->m_NumLayers; l++) {
-      CMapItemLayer *pLayer = GetItem(
+      CMapItemLayer *pLayer = get_item(
           pTmpDataFile, LayersStart + pGroup->m_StartLayer + l, NULL, NULL);
       if (pLayer->m_Type == 2) // LAYERTYPE_TILES
       {
         CMapItemLayerTilemap *pTilemap = (CMapItemLayerTilemap *)pLayer;
         if (pTilemap->m_Flags & TILESLAYERFLAG_GAME) {
           // printf("found game layer! yay!\n");
-          CTile *pTiles = GetData(pTmpDataFile, pTilemap->m_Data);
+          CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
           unsigned char *pNewData =
               malloc(pTilemap->m_Width * pTilemap->m_Height);
           unsigned char *pNewFlags =
@@ -386,4 +386,10 @@ GameTiles LoadMap(const char *pName) {
   fclose(pMapFile);
   free(pTmpDataFile);
   return Tiles;
+}
+
+void free_map_data(GameTiles *pGameTiles)
+{
+  free(pGameTiles->m_pData);
+  free(pGameTiles->m_pFlags);
 }

@@ -33,6 +33,7 @@ struct GameTiles {
   int m_Height;
 } typedef GameTiles;
 
-GameTiles LoadMap(const char *pName);
+GameTiles load_map(const char *pName);
+void free_map_data(GameTiles *pGameTiles);
 
 #endif // MAP_LOADER_H
