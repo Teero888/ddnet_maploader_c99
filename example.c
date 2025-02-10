@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 int main() {
-  GameTiles map_data = load_map("/home/teero/.local/share/ddnet/maps/za1e.map");
+  GameTiles map_data = load_map("/path/to/your/map.map");
 
   if (!map_data.m_pData)
     return 1;
