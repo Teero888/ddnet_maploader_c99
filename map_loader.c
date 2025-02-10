@@ -1,4 +1,4 @@
-#include "loader.h"
+#include "map_loader.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -263,7 +263,6 @@ GameTiles LoadMap(const char *pName) {
   pMapFile = fopen(pName, "r");
   if (!pMapFile) {
     printf("Could not load map: %s\n", pName);
-    fclose(pMapFile);
     return (GameTiles){};
   }
 
