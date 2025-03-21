@@ -56,6 +56,36 @@ struct {
 } typedef CTile;
 
 struct {
+  unsigned char m_Number;
+  unsigned char m_Type;
+} typedef CTeleTile;
+
+struct {
+  unsigned char m_Force;
+  unsigned char m_MaxSpeed;
+  unsigned char m_Type;
+  short m_Angle;
+} typedef CSpeedupTile;
+
+struct {
+  unsigned char m_Number;
+  unsigned char m_Type;
+  unsigned char m_Flags;
+  unsigned char m_Delay;
+} typedef CSwitchTile;
+
+struct {
+  unsigned char m_Index;
+  unsigned char m_Flags;
+  int m_Number;
+} typedef CDoorTile;
+
+struct {
+  unsigned char m_Number;
+  unsigned char m_Type;
+} typedef CTuneTile;
+
+struct {
   int m_Version;
   int m_OffsetX;
   int m_OffsetY;
@@ -72,10 +102,15 @@ struct {
   int m_Flags;
 } typedef CMapItemLayer;
 
-enum {
-  CURRENT_VERSION = 3,
-  TILE_SKIP_MIN_VERSION = 4, // supported for loading but not saving
-};
+struct {
+  int m_Version;
+  int m_Author;
+  int m_MapVersion;
+  int m_Credits;
+  int m_License;
+  int m_Settings;
+} typedef CMapItemInfoSettings;
+
 struct {
 
   CMapItemLayer m_Layer;
@@ -233,6 +268,13 @@ void get_type(CDatafile *pDataFile, int Type, int *pStart, int *pNum) {
     }
   }
 }
+int get_itemsize(CDatafile *pDataFile, int Index) {
+  if (Index == pDataFile->m_Header.m_NumItems - 1)
+    return pDataFile->m_Header.m_ItemSize -
+           pDataFile->m_Info.m_pItemOffsets[Index] - sizeof(CDatafileItem);
+  return pDataFile->m_Info.m_pItemOffsets[Index + 1] -
+         pDataFile->m_Info.m_pItemOffsets[Index] - sizeof(CDatafileItem);
+}
 
 void *get_item(CDatafile *pDataFile, int Index, int *pType, int *pId) {
   if (!pDataFile) {
@@ -258,13 +300,32 @@ void *get_item(CDatafile *pDataFile, int Index, int *pType, int *pId) {
   return (void *)(pItem + 1);
 }
 
-GameTiles load_map(const char *pName) {
+int get_data_size(CDatafile *pDataFile, int Index) {
+  if (Index < 0 || Index >= pDataFile->m_Header.m_NumRawData) {
+    return 0;
+  }
+  if (!pDataFile->m_ppDataPtrs[Index]) {
+    if (pDataFile->m_Header.m_Version >= 4) {
+      return pDataFile->m_Info.m_pDataSizes[Index];
+    } else {
+      return get_file_data_size(pDataFile, Index);
+    }
+  }
+  const int Size = pDataFile->m_pDataSizes[Index];
+  if (Size < 0)
+    return 0;
+  return Size;
+}
+
+SMapData load_map(const char *pName) {
   FILE *pMapFile;
   pMapFile = fopen(pName, "r");
   if (!pMapFile) {
     printf("Could not load map: %s\n", pName);
-    return (GameTiles){};
+    return (SMapData){};
   }
+  SMapData MapData;
+  memset(&MapData, 0, sizeof(SMapData));
 
   // read in the header
   CDatafileHeader FileHeader;
@@ -290,7 +351,7 @@ GameTiles load_map(const char *pName) {
       FileHeader.m_ItemSize < 0) {
     fclose(pMapFile);
     printf("Invalid map signature\n");
-    return (GameTiles){};
+    return MapData;
   }
 
   CDatafile *pTmpDataFile = (CDatafile *)malloc(AllocSize);
@@ -313,7 +374,7 @@ GameTiles load_map(const char *pName) {
     free(pTmpDataFile);
     fclose(pMapFile);
     printf("Could not load whole map. got %d expected %d\n", ReadSize, Size);
-    return (GameTiles){};
+    return MapData;
   }
 
   pTmpDataFile->m_Info.m_pItemTypes =
@@ -345,36 +406,142 @@ GameTiles load_map(const char *pName) {
   get_type(pTmpDataFile, MAPITEMTYPE_GROUP, &GroupsStart, &GroupsNum);
   get_type(pTmpDataFile, MAPITEMTYPE_LAYER, &LayersStart, &LayersNum);
 
-  GameTiles Tiles;
   for (int g = 0; g < GroupsNum; ++g) {
     CMapItemGroup *pGroup = get_item(pTmpDataFile, GroupsStart + g, NULL, NULL);
     for (int l = 0; l < pGroup->m_NumLayers; l++) {
       CMapItemLayer *pLayer = get_item(
           pTmpDataFile, LayersStart + pGroup->m_StartLayer + l, NULL, NULL);
-      if (pLayer->m_Type == 2) // LAYERTYPE_TILES
-      {
-        CMapItemLayerTilemap *pTilemap = (CMapItemLayerTilemap *)pLayer;
-        if (pTilemap->m_Flags & TILESLAYERFLAG_GAME) {
-          // printf("found game layer! yay!\n");
-          CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-          unsigned char *pNewData =
-              malloc(pTilemap->m_Width * pTilemap->m_Height);
-          unsigned char *pNewFlags =
-              malloc(pTilemap->m_Width * pTilemap->m_Height);
+      if (pLayer->m_Type != 2) // LAYERTYPE_TILES
+        continue;
 
-          for (int i = 0; i < pTilemap->m_Width * pTilemap->m_Height; ++i) {
-            pNewData[i] = pTiles[i].m_Index;
-            pNewFlags[i] = pTiles[i].m_Flags;
-          }
-
-          Tiles = (GameTiles){.m_pData = pNewData,
-                              .m_pFlags = pNewFlags,
-                              .m_Width = pTilemap->m_Width,
-                              .m_Height = pTilemap->m_Height};
-          break;
+      CMapItemLayerTilemap *pTilemap = (CMapItemLayerTilemap *)pLayer;
+      size_t Size = pTilemap->m_Width * pTilemap->m_Height;
+      if (pTilemap->m_Flags & TILESLAYERFLAG_GAME) {
+        CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
+        unsigned char *pNewData = malloc(Size);
+        unsigned char *pNewFlags = malloc(Size);
+        for (int i = 0; i < Size; ++i) {
+          pNewData[i] = pTiles[i].m_Index;
+          pNewFlags[i] = pTiles[i].m_Flags;
         }
+        MapData.m_GameLayer.m_pData = pNewData;
+        MapData.m_GameLayer.m_pFlags = pNewFlags;
+        MapData.m_Width = pTilemap->m_Width;
+        MapData.m_Height = pTilemap->m_Height;
+        continue;
+      }
+      if (pTilemap->m_Flags & TILESLAYERFLAG_FRONT) {
+        CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
+        unsigned char *pNewData = malloc(Size);
+        unsigned char *pNewFlags = malloc(Size);
+        for (int i = 0; i < Size; ++i) {
+          pNewData[i] = pTiles[i].m_Index;
+          pNewFlags[i] = pTiles[i].m_Flags;
+        }
+        MapData.m_FrontLayer.m_pData = pNewData;
+        MapData.m_FrontLayer.m_pFlags = pNewFlags;
+        continue;
+      }
+      if (pTilemap->m_Flags & TILESLAYERFLAG_TELE) {
+        CTeleTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
+        unsigned char *pNewType = malloc(Size);
+        unsigned char *pNewNumber = malloc(Size);
+        for (int i = 0; i < Size; ++i) {
+          pNewType[i] = pTiles[i].m_Type;
+          pNewNumber[i] = pTiles[i].m_Number;
+        }
+        MapData.m_TeleLayer.m_pType = pNewType;
+        MapData.m_TeleLayer.m_pNumber = pNewNumber;
+        continue;
+      }
+      if (pTilemap->m_Flags & TILESLAYERFLAG_SPEEDUP) {
+        CSpeedupTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
+        unsigned char *pNewForce = malloc(Size);
+        unsigned char *pNewMaxSpeed = malloc(Size);
+        unsigned char *pNewType = malloc(Size);
+        short *pNewAngle = malloc(Size);
+        for (int i = 0; i < Size; ++i) {
+          pNewForce[i] = pTiles[i].m_Force;
+          pNewMaxSpeed[i] = pTiles[i].m_MaxSpeed;
+          pNewType[i] = pTiles[i].m_Type;
+          pNewAngle[i] = pTiles[i].m_Angle;
+        }
+        MapData.m_SpeedupLayer.m_pForce = pNewForce;
+        MapData.m_SpeedupLayer.m_pMaxSpeed = pNewMaxSpeed;
+        MapData.m_SpeedupLayer.m_pType = pNewType;
+        MapData.m_SpeedupLayer.m_pAngle = pNewAngle;
+        continue;
+      }
+      if (pTilemap->m_Flags & TILESLAYERFLAG_SWITCH) {
+        CSwitchTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
+        unsigned char *pNewType = malloc(Size);
+        unsigned char *pNewNumber = malloc(Size);
+        unsigned char *pNewFlags = malloc(Size);
+        unsigned char *pNewDelay = malloc(Size);
+        for (int i = 0; i < Size; ++i) {
+          pNewType[i] = pTiles[i].m_Type;
+          pNewNumber[i] = pTiles[i].m_Number;
+          pNewFlags[i] = pTiles[i].m_Flags;
+          pNewDelay[i] = pTiles[i].m_Delay;
+        }
+        MapData.m_SwitchLayer.m_pType = pNewType;
+        MapData.m_SwitchLayer.m_pNumber = pNewNumber;
+        MapData.m_SwitchLayer.m_pFlags = pNewFlags;
+        MapData.m_SwitchLayer.m_pDelay = pNewDelay;
+        continue;
+      }
+      if (pTilemap->m_Flags & TILESLAYERFLAG_TUNE) {
+        CTuneTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
+        unsigned char *pNewType = malloc(Size);
+        unsigned char *pNewNumber = malloc(Size);
+        for (int i = 0; i < Size; ++i) {
+          pNewType[i] = pTiles[i].m_Type;
+          pNewNumber[i] = pTiles[i].m_Number;
+        }
+        MapData.m_SwitchLayer.m_pType = pNewType;
+        MapData.m_SwitchLayer.m_pNumber = pNewNumber;
+        continue;
       }
     }
+  }
+
+  int InfoNum;
+  int InfoStart;
+  get_type(pTmpDataFile, MAPITEMTYPE_INFO, &InfoStart, &InfoNum);
+  for (int i = InfoStart; i < InfoStart + InfoNum; i++) {
+    int ItemId;
+    CMapItemInfoSettings *pItem =
+        (CMapItemInfoSettings *)get_item(pTmpDataFile, i, NULL, &ItemId);
+    int ItemSize = get_itemsize(pTmpDataFile, i);
+    if (!pItem || ItemId != 0)
+      continue;
+
+    if (ItemSize < (int)sizeof(CMapItemInfoSettings))
+      break;
+    if (!(pItem->m_Settings > -1))
+      break;
+
+    int Size = get_data_size(pTmpDataFile, pItem->m_Settings);
+    char *pSettings = (char *)get_data(pTmpDataFile, pItem->m_Settings);
+    char *pNext = pSettings;
+    MapData.m_NumSettings = 0;
+    while (pNext < pSettings + Size) {
+      int StrSize = strlen(pNext) + 1;
+      pNext += StrSize;
+      ++MapData.m_NumSettings;
+    }
+    MapData.m_ppSettings = malloc(MapData.m_NumSettings * sizeof(void *));
+
+    pNext = pSettings;
+    int a = 0;
+    while (pNext < pSettings + Size) {
+      int StrSize = strlen(pNext) + 1;
+      MapData.m_ppSettings[a] = malloc(StrSize);
+      strcpy(MapData.m_ppSettings[a], pNext);
+      ++a;
+      pNext += StrSize;
+    }
+    break;
   }
 
   // free the data that is loaded
@@ -385,11 +552,51 @@ GameTiles load_map(const char *pName) {
   }
   fclose(pMapFile);
   free(pTmpDataFile);
-  return Tiles;
+  return MapData;
 }
 
-void free_map_data(GameTiles *pGameTiles)
-{
-  free(pGameTiles->m_pData);
-  free(pGameTiles->m_pFlags);
+void free_map_data(SMapData *pMapData) {
+  if (pMapData == NULL)
+    return;
+
+  // Free GameLayer data
+  free(pMapData->m_GameLayer.m_pData);
+  free(pMapData->m_GameLayer.m_pFlags);
+
+  // Free FrontLayer data
+  free(pMapData->m_FrontLayer.m_pData);
+  free(pMapData->m_FrontLayer.m_pFlags);
+
+  // Free TeleLayer data
+  free(pMapData->m_TeleLayer.m_pNumber);
+  free(pMapData->m_TeleLayer.m_pType);
+
+  // Free SpeedupLayer data
+  free(pMapData->m_SpeedupLayer.m_pForce);
+  free(pMapData->m_SpeedupLayer.m_pMaxSpeed);
+  free(pMapData->m_SpeedupLayer.m_pType);
+  free(pMapData->m_SpeedupLayer.m_pAngle);
+
+  // Free SwitchLayer data
+  free(pMapData->m_SwitchLayer.m_pNumber);
+  free(pMapData->m_SwitchLayer.m_pType);
+  free(pMapData->m_SwitchLayer.m_pFlags);
+  free(pMapData->m_SwitchLayer.m_pDelay);
+
+  // Free DoorLayer data
+  free(pMapData->m_DoorLayer.m_pIndex);
+  free(pMapData->m_DoorLayer.m_pFlags);
+  free(pMapData->m_DoorLayer.m_pNumber);
+
+  // Free TuneLayer data
+  free(pMapData->m_TuneLayer.m_pNumber);
+  free(pMapData->m_TuneLayer.m_pType);
+
+  // Free settings string
+  for (int i = 0; i < pMapData->m_NumSettings; ++i)
+    free(pMapData->m_ppSettings[i]);
+  free(pMapData->m_ppSettings);
+
+  // Reset all to 0
+  memset(pMapData, 0, sizeof(SMapData));
 }
