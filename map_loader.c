@@ -631,6 +631,10 @@ void free_map_data(SMapData *pMapData) {
     free(pMapData->m_ppSettings[i]);
   free(pMapData->m_ppSettings);
 
+  free(pMapData->m_pSpawnPoints);
+  free(pMapData->m_pTeleOuts);
+  free(pMapData->m_pTeleCheckOuts);
+
   // Reset all to 0
   memset(pMapData, 0, sizeof(SMapData));
 }
