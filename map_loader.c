@@ -5,18 +5,18 @@
 #include <string.h>
 #include <zlib.h>
 
-struct {
+typedef struct {
   int m_Type;
   int m_Start;
   int m_Num;
-} typedef CDatafileItemType;
+} CDatafileItemType;
 
-struct {
+typedef struct {
   int m_TypeAndId;
   int m_Size;
-} typedef CDatafileItem;
+} CDatafileItem;
 
-struct {
+typedef struct {
   char m_aId[4];
   int m_Version;
   int m_Size;
@@ -26,9 +26,9 @@ struct {
   int m_NumRawData;
   int m_ItemSize;
   int m_DataSize;
-} typedef CDatafileHeader;
+} CDatafileHeader;
 
-struct {
+typedef struct {
   CDatafileItemType *m_pItemTypes;
   int *m_pItemOffsets;
   int *m_pDataOffsets;
@@ -36,9 +36,9 @@ struct {
 
   char *m_pItemStart;
   char *m_pDataStart;
-} typedef CDatafileInfo;
+} CDatafileInfo;
 
-struct {
+typedef struct {
   FILE *m_pFile;
   CDatafileInfo m_Info;
   CDatafileHeader m_Header;
@@ -46,46 +46,46 @@ struct {
   char **m_ppDataPtrs;
   int *m_pDataSizes;
   char *m_pData;
-} typedef CDatafile;
+} CDatafile;
 
-struct {
+typedef struct {
   unsigned char m_Index;
   unsigned char m_Flags;
   unsigned char m_Skip;
   unsigned char m_Reserved;
-} typedef CTile;
+} CTile;
 
-struct {
+typedef struct {
   unsigned char m_Number;
   unsigned char m_Type;
-} typedef CTeleTile;
+} CTeleTile;
 
-struct {
+typedef struct {
   unsigned char m_Force;
   unsigned char m_MaxSpeed;
   unsigned char m_Type;
   short m_Angle;
-} typedef CSpeedupTile;
+} CSpeedupTile;
 
-struct {
+typedef struct {
   unsigned char m_Number;
   unsigned char m_Type;
   unsigned char m_Flags;
   unsigned char m_Delay;
-} typedef CSwitchTile;
+} CSwitchTile;
 
-struct {
+typedef struct {
   unsigned char m_Index;
   unsigned char m_Flags;
   int m_Number;
-} typedef CDoorTile;
+} CDoorTile;
 
-struct {
+typedef struct {
   unsigned char m_Number;
   unsigned char m_Type;
-} typedef CTuneTile;
+} CTuneTile;
 
-struct {
+typedef struct {
   int m_Version;
   int m_OffsetX;
   int m_OffsetY;
@@ -94,25 +94,24 @@ struct {
 
   int m_StartLayer;
   int m_NumLayers;
-} typedef CMapItemGroup;
+} CMapItemGroup;
 
-struct {
+typedef struct {
   int m_Version;
   int m_Type;
   int m_Flags;
-} typedef CMapItemLayer;
+} CMapItemLayer;
 
-struct {
+typedef struct {
   int m_Version;
   int m_Author;
   int m_MapVersion;
   int m_Credits;
   int m_License;
   int m_Settings;
-} typedef CMapItemInfoSettings;
+} CMapItemInfoSettings;
 
-struct {
-
+typedef struct {
   CMapItemLayer m_Layer;
   int m_Version;
 
@@ -136,7 +135,7 @@ struct {
   int m_Front;
   int m_Switch;
   int m_Tune;
-} typedef CMapItemLayerTilemap;
+} CMapItemLayerTilemap;
 
 enum {
   LAYERFLAG_DETAIL = 1,
@@ -415,7 +414,8 @@ SMapData load_map(const char *pName) {
         continue;
 
       CMapItemLayerTilemap *pTilemap = (CMapItemLayerTilemap *)pLayer;
-      size_t Size = pTilemap->m_Width * pTilemap->m_Height;
+      // its fine. no map is over 40'000x40'000 big
+      int Size = pTilemap->m_Width * pTilemap->m_Height;
       if (pTilemap->m_Flags & TILESLAYERFLAG_GAME) {
         CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
         unsigned char *pNewData = malloc(Size);

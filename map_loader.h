@@ -166,42 +166,42 @@ enum {
   ENTITY_OFFSET = 255 - 16 * 4,
 };
 
-struct GameLayer {
+typedef struct GameLayer {
   unsigned char *m_pData;
   unsigned char *m_pFlags;
-} typedef SGameLayer;
+} SGameLayer;
 
-struct TeleLayer {
+typedef struct TeleLayer {
   unsigned char *m_pNumber;
   unsigned char *m_pType;
-} typedef STeleLayer;
+} STeleLayer;
 
-struct SpeedupLayer {
+typedef struct SpeedupLayer {
   unsigned char *m_pForce;
   unsigned char *m_pMaxSpeed;
   unsigned char *m_pType;
   short *m_pAngle;
-} typedef SSpeedupLayer;
+} SSpeedupLayer;
 
-struct SwitchLayer {
+typedef struct SwitchLayer {
   unsigned char *m_pNumber;
   unsigned char *m_pType;
   unsigned char *m_pFlags;
   unsigned char *m_pDelay;
-} typedef SSwitchLayer;
+} SSwitchLayer;
 
-struct DoorLayer {
+typedef struct DoorLayer {
   unsigned char *m_pIndex;
   unsigned char *m_pFlags;
   int *m_pNumber;
-} typedef SDoorLayer;
+} SDoorLayer;
 
-struct TuneLayer {
+typedef struct TuneLayer {
   unsigned char *m_pNumber;
   unsigned char *m_pType;
-} typedef STuneLayer;
+} STuneLayer;
 
-struct MapData {
+typedef struct MapData {
   int m_Width;
   int m_Height;
 
@@ -216,7 +216,7 @@ struct MapData {
   int m_NumSettings;
   char **m_ppSettings;
 
-} typedef SMapData;
+} SMapData;
 
 SMapData load_map(const char *pName);
 void free_map_data(SMapData *pMapData);
