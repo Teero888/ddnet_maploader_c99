@@ -221,12 +221,11 @@ typedef struct MapData {
   char **m_ppSettings;
 
   int m_NumSpawnPoints;
-  int m_NumTeleOuts;
-  int m_NumTeleCheckOuts;
   v2 *m_pSpawnPoints;
-  v2 *m_pTeleOuts;
-  v2 *m_pTeleCheckOuts;
-
+  int m_aNumTeleOuts[256];
+  v2 *m_apTeleOuts[256];
+  int m_aNumTeleCheckOuts[256];
+  v2 *m_apTeleCheckOuts[256];
 } SMapData;
 
 SMapData load_map(const char *pName);

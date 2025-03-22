@@ -556,33 +556,36 @@ SMapData load_map(const char *pName) {
   // Figure out important things
   // Make lists of spawn points, tele outs and tele checkpoints outs
   for (int i = 0; i < MapData.m_Width * MapData.m_Height; ++i) {
-    if (MapData.m_GameLayer.m_pData[i] == ENTITY_SPAWN ||
-        MapData.m_GameLayer.m_pData[i] == ENTITY_SPAWN_RED ||
-        MapData.m_GameLayer.m_pData[i] == ENTITY_SPAWN_BLUE)
+    if (MapData.m_GameLayer.m_pData[i] >= 192 &&
+        MapData.m_GameLayer.m_pData[i] <= 194)
       ++MapData.m_NumSpawnPoints;
     if (MapData.m_TeleLayer.m_pType[i] == TILE_TELEOUT)
-      ++MapData.m_NumTeleOuts;
+      ++MapData.m_aNumTeleOuts[MapData.m_TeleLayer.m_pNumber[i]];
     if (MapData.m_TeleLayer.m_pType[i] == TILE_TELECHECKOUT)
-      ++MapData.m_NumTeleCheckOuts;
+      ++MapData.m_aNumTeleCheckOuts[MapData.m_TeleLayer.m_pNumber[i]];
   }
   MapData.m_pSpawnPoints = malloc(MapData.m_NumSpawnPoints * sizeof(v2));
-  MapData.m_pTeleOuts = malloc(MapData.m_NumTeleOuts * sizeof(v2));
-  MapData.m_pTeleCheckOuts = malloc(MapData.m_NumTeleCheckOuts * sizeof(v2));
+  for (int i = 0; i < 256; ++i) {
+    if (MapData.m_aNumTeleOuts[i] > 0)
+      MapData.m_apTeleOuts[i] = malloc(MapData.m_aNumTeleOuts[i] * sizeof(v2));
+    if (MapData.m_aNumTeleCheckOuts[i] > 0)
+      MapData.m_apTeleCheckOuts[i] =
+          malloc(MapData.m_aNumTeleCheckOuts[i] * sizeof(v2));
+  }
 
-  MapData.m_NumSpawnPoints = 0;
-  MapData.m_NumTeleOuts = 0;
-  MapData.m_NumTeleCheckOuts = 0;
+  int TeleIdx = 0, TeleCheckIdx = 0, SpawnPointIdx = 0;
   for (int y = 0; y < MapData.m_Height; ++y) {
     for (int x = 0; x < MapData.m_Width; ++x) {
       int Idx = y * MapData.m_Width + x;
-      if (MapData.m_GameLayer.m_pData[Idx] == ENTITY_SPAWN ||
-          MapData.m_GameLayer.m_pData[Idx] == ENTITY_SPAWN_RED ||
-          MapData.m_GameLayer.m_pData[Idx] == ENTITY_SPAWN_BLUE)
-        MapData.m_pSpawnPoints[MapData.m_NumSpawnPoints++] = (v2){x, y};
+      if (MapData.m_GameLayer.m_pData[Idx] >= 192 &&
+          MapData.m_GameLayer.m_pData[Idx] <= 194)
+        MapData.m_pSpawnPoints[SpawnPointIdx++] = (v2){x, y};
       if (MapData.m_TeleLayer.m_pType[Idx] == TILE_TELEOUT)
-        MapData.m_pTeleOuts[MapData.m_NumTeleOuts++] = (v2){x, y};
+        MapData.m_apTeleOuts[MapData.m_TeleLayer.m_pNumber[Idx]][TeleIdx++] =
+            (v2){x, y};
       if (MapData.m_TeleLayer.m_pType[Idx] == TILE_TELECHECKOUT)
-        MapData.m_pTeleCheckOuts[MapData.m_NumTeleCheckOuts++] = (v2){x, y};
+        MapData.m_apTeleCheckOuts[MapData.m_TeleLayer.m_pNumber[Idx]]
+                                 [TeleCheckIdx++] = (v2){x, y};
     }
   }
 
@@ -632,8 +635,10 @@ void free_map_data(SMapData *pMapData) {
   free(pMapData->m_ppSettings);
 
   free(pMapData->m_pSpawnPoints);
-  free(pMapData->m_pTeleOuts);
-  free(pMapData->m_pTeleCheckOuts);
+  for (int i = 0; i < 256; ++i) {
+    free(pMapData->m_apTeleOuts[i]);
+    free(pMapData->m_apTeleCheckOuts[i]);
+  }
 
   // Reset all to 0
   memset(pMapData, 0, sizeof(SMapData));
