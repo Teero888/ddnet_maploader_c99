@@ -201,6 +201,10 @@ typedef struct TuneLayer {
   unsigned char *m_pType;
 } STuneLayer;
 
+typedef struct {
+  float x, y;
+} v2;
+
 typedef struct MapData {
   int m_Width;
   int m_Height;
@@ -215,6 +219,13 @@ typedef struct MapData {
 
   int m_NumSettings;
   char **m_ppSettings;
+
+  int m_NumSpawnPoints;
+  int m_NumTeleOuts;
+  int m_NumTeleCheckOuts;
+  v2 *m_pSpawnPoints;
+  v2 *m_pTeleOuts;
+  v2 *m_pTeleCheckOuts;
 
 } SMapData;
 

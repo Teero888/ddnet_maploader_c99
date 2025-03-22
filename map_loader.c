@@ -552,6 +552,40 @@ SMapData load_map(const char *pName) {
   }
   fclose(pMapFile);
   free(pTmpDataFile);
+
+  // Figure out important things
+  // Make lists of spawn points, tele outs and tele checkpoints outs
+  for (int i = 0; i < MapData.m_Width * MapData.m_Height; ++i) {
+    if (MapData.m_GameLayer.m_pData[i] == ENTITY_SPAWN ||
+        MapData.m_GameLayer.m_pData[i] == ENTITY_SPAWN_RED ||
+        MapData.m_GameLayer.m_pData[i] == ENTITY_SPAWN_BLUE)
+      ++MapData.m_NumSpawnPoints;
+    if (MapData.m_TeleLayer.m_pType[i] == TILE_TELEOUT)
+      ++MapData.m_NumTeleOuts;
+    if (MapData.m_TeleLayer.m_pType[i] == TILE_TELECHECKOUT)
+      ++MapData.m_NumTeleCheckOuts;
+  }
+  MapData.m_pSpawnPoints = malloc(MapData.m_NumSpawnPoints * sizeof(v2));
+  MapData.m_pTeleOuts = malloc(MapData.m_NumTeleOuts * sizeof(v2));
+  MapData.m_pTeleCheckOuts = malloc(MapData.m_NumTeleCheckOuts * sizeof(v2));
+
+  MapData.m_NumSpawnPoints = 0;
+  MapData.m_NumTeleOuts = 0;
+  MapData.m_NumTeleCheckOuts = 0;
+  for (int y = 0; y < MapData.m_Height; ++y) {
+    for (int x = 0; x < MapData.m_Width; ++x) {
+      int Idx = y * MapData.m_Width + x;
+      if (MapData.m_GameLayer.m_pData[Idx] == ENTITY_SPAWN ||
+          MapData.m_GameLayer.m_pData[Idx] == ENTITY_SPAWN_RED ||
+          MapData.m_GameLayer.m_pData[Idx] == ENTITY_SPAWN_BLUE)
+        MapData.m_pSpawnPoints[MapData.m_NumSpawnPoints++] = (v2){x, y};
+      if (MapData.m_TeleLayer.m_pType[Idx] == TILE_TELEOUT)
+        MapData.m_pTeleOuts[MapData.m_NumTeleOuts++] = (v2){x, y};
+      if (MapData.m_TeleLayer.m_pType[Idx] == TILE_TELECHECKOUT)
+        MapData.m_pTeleCheckOuts[MapData.m_NumTeleCheckOuts++] = (v2){x, y};
+    }
+  }
+
   return MapData;
 }
 
