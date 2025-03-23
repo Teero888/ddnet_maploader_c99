@@ -206,10 +206,10 @@ typedef struct {
 } v2;
 
 typedef struct MapData {
+  SGameLayer m_GameLayer;
   int m_Width;
   int m_Height;
 
-  SGameLayer m_GameLayer;
   SGameLayer m_FrontLayer;
   STeleLayer m_TeleLayer;
   SSpeedupLayer m_SpeedupLayer;
@@ -217,15 +217,15 @@ typedef struct MapData {
   SDoorLayer m_DoorLayer;
   STuneLayer m_TuneLayer;
 
-  int m_NumSettings;
-  char **m_ppSettings;
-
   int m_NumSpawnPoints;
   v2 *m_pSpawnPoints;
   int m_aNumTeleOuts[256];
   v2 *m_apTeleOuts[256];
   int m_aNumTeleCheckOuts[256];
   v2 *m_apTeleCheckOuts[256];
+
+  int m_NumSettings;
+  char **m_ppSettings;
 } SMapData;
 
 SMapData load_map(const char *pName);
