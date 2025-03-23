@@ -201,9 +201,14 @@ typedef struct TuneLayer {
   unsigned char *m_pType;
 } STuneLayer;
 
+#ifndef ALIGN
+#define ALIGN(x) __attribute__((aligned(x)))
+#endif
+// Has to be 16byte aligned for my physics library
+// you may change it
 typedef struct {
   float x, y;
-} v2;
+} ALIGN(16) v2;
 
 typedef struct MapData {
   SGameLayer m_GameLayer;

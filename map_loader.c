@@ -564,6 +564,7 @@ SMapData load_map(const char *pName) {
     if (MapData.m_TeleLayer.m_pType[i] == TILE_TELECHECKOUT)
       ++MapData.m_aNumTeleCheckOuts[MapData.m_TeleLayer.m_pNumber[i]];
   }
+
   MapData.m_pSpawnPoints = malloc(MapData.m_NumSpawnPoints * sizeof(v2));
   for (int i = 0; i < 256; ++i) {
     if (MapData.m_aNumTeleOuts[i] > 0)
