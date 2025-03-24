@@ -1,6 +1,7 @@
 #ifndef MAP_LOADER_H
 #define MAP_LOADER_H
 
+#include <stdbool.h>
 enum {
   ENTITY_NULL = 0,
   ENTITY_SPAWN,
@@ -213,18 +214,19 @@ typedef struct MapData {
   SDoorLayer m_DoorLayer;
   STuneLayer m_TuneLayer;
 
+  int m_NumSettings;
+  char **m_ppSettings;
+
+  // This will only get calculated if load_map is called with Ex == true
   int m_NumSpawnPoints;
   float (*m_pSpawnPoints)[4];
   int m_aNumTeleOuts[256];
   float (*m_apTeleOuts[256])[4];
   int m_aNumTeleCheckOuts[256];
   float (*m_apTeleCheckOuts[256])[4];
-
-  int m_NumSettings;
-  char **m_ppSettings;
 } SMapData;
 
-SMapData load_map(const char *pName);
+SMapData load_map(const char *pName, bool Ex);
 void free_map_data(SMapData *pMapData);
 
 #endif // MAP_LOADER_H

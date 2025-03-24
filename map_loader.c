@@ -316,7 +316,7 @@ int get_data_size(CDatafile *pDataFile, int Index) {
   return Size;
 }
 
-SMapData load_map(const char *pName) {
+SMapData load_map(const char *pName, bool Ex) {
   FILE *pMapFile;
   pMapFile = fopen(pName, "r");
   if (!pMapFile) {
@@ -552,6 +552,11 @@ SMapData load_map(const char *pName) {
   }
   fclose(pMapFile);
   free(pTmpDataFile);
+
+  // This code might be a little expensive so i'll hide it behind Ex
+  // This is mostly just for my physics lib to work
+  if (!Ex)
+    return MapData;
 
   // Figure out important things
   // Make lists of spawn points, tele outs and tele checkpoints outs
