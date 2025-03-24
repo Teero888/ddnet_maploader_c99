@@ -565,14 +565,14 @@ SMapData load_map(const char *pName) {
       ++MapData.m_aNumTeleCheckOuts[MapData.m_TeleLayer.m_pNumber[i]];
   }
 
-  MapData.m_pSpawnPoints = malloc(MapData.m_NumSpawnPoints * sizeof(float) * 4);
+  MapData.m_pSpawnPoints = malloc(MapData.m_NumSpawnPoints * sizeof(float[4]));
   for (int i = 0; i < 256; ++i) {
     if (MapData.m_aNumTeleOuts[i] > 0)
       MapData.m_apTeleOuts[i] =
-          malloc(MapData.m_aNumTeleOuts[i] * sizeof(float) * 4);
+          malloc(MapData.m_aNumTeleOuts[i] * sizeof(float[4]));
     if (MapData.m_aNumTeleCheckOuts[i] > 0)
       MapData.m_apTeleCheckOuts[i] =
-          malloc(MapData.m_aNumTeleCheckOuts[i] * sizeof(float) * 4);
+          malloc(MapData.m_aNumTeleCheckOuts[i] * sizeof(float[4]));
   }
 
   int TeleIdx = 0, TeleCheckIdx = 0, SpawnPointIdx = 0;
