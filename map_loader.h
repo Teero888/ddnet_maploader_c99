@@ -216,17 +216,9 @@ typedef struct MapData {
 
   int m_NumSettings;
   char **m_ppSettings;
-
-  // This will only get calculated if load_map is called with Ex == true
-  int m_NumSpawnPoints;
-  float (*m_pSpawnPoints)[4];
-  int m_aNumTeleOuts[256];
-  float (*m_apTeleOuts[256])[4];
-  int m_aNumTeleCheckOuts[256];
-  float (*m_apTeleCheckOuts[256])[4];
 } SMapData;
 
-SMapData load_map(const char *pName, bool Ex);
+SMapData load_map(const char *pName);
 void free_map_data(SMapData *pMapData);
 
 #endif // MAP_LOADER_H

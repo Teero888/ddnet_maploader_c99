@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 int main(void) {
-  SMapData map_data = load_map("/path/to/your/map.map", false);
+  SMapData map_data = load_map("/path/to/your/map.map");
 
   if (!map_data.m_GameLayer.m_pData)
     return 1;
