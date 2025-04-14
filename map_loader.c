@@ -138,7 +138,6 @@ typedef struct {
 } CMapItemLayerTilemap;
 
 enum {
-  LAYERFLAG_DETAIL = 1,
   TILESLAYERFLAG_GAME = 1,
   TILESLAYERFLAG_TELE = 2,
   TILESLAYERFLAG_SPEEDUP = 4,
@@ -164,11 +163,16 @@ int get_file_data_size(CDatafile *pDataFile, int Index) {
   }
 
   if (Index == pDataFile->m_Header.m_NumRawData - 1)
-    return pDataFile->m_Header.m_DataSize -
-           pDataFile->m_Info.m_pDataOffsets[Index];
+    return pDataFile->m_Header.m_DataSize - pDataFile->m_Info.m_pDataOffsets[Index];
 
-  return pDataFile->m_Info.m_pDataOffsets[Index + 1] -
-         pDataFile->m_Info.m_pDataOffsets[Index];
+  return pDataFile->m_Info.m_pDataOffsets[Index + 1] - pDataFile->m_Info.m_pDataOffsets[Index];
+}
+
+static void swap_endian(void *pData, size_t Size, size_t Num) {
+  uint32_t *pInt = (uint32_t *)pData;
+  for (size_t i = 0; i < Num; i++)
+    pInt[i] = ((pInt[i] >> 24) & 0x000000FF) | ((pInt[i] >> 8) & 0x0000FF00) | ((pInt[i] << 8) & 0x00FF0000) |
+              ((pInt[i] << 24) & 0xFF000000);
 }
 
 void *get_data(CDatafile *pDataFile, int Index) {
@@ -176,16 +180,18 @@ void *get_data(CDatafile *pDataFile, int Index) {
     return NULL;
   }
 
-  if (Index < 0 || Index >= pDataFile->m_Header.m_NumRawData)
+  if (Index < 0 || Index >= pDataFile->m_Header.m_NumRawData) {
     return NULL;
+  }
 
-  // load it if needed
+  // Load it if needed
   if (!pDataFile->m_ppDataPtrs[Index]) {
-    // don't try to load again if it previously failed
-    if (pDataFile->m_pDataSizes[Index] < 0)
+    // Don't try to load again if it previously failed
+    if (pDataFile->m_pDataSizes[Index] < 0) {
       return NULL;
+    }
 
-    // fetch the data size
+    // Fetch the data size
     unsigned DataSize = get_file_data_size(pDataFile, Index);
 #if defined(CONF_ARCH_ENDIAN_BIG)
     unsigned SwapSize = DataSize;
@@ -193,19 +199,16 @@ void *get_data(CDatafile *pDataFile, int Index) {
 
     if (pDataFile->m_Header.m_Version == 4) {
       // v4 has compressed data
-      const unsigned OriginalUncompressedSize =
-          pDataFile->m_Info.m_pDataSizes[Index];
+      const unsigned OriginalUncompressedSize = pDataFile->m_Info.m_pDataSizes[Index];
       unsigned long UncompressedSize = OriginalUncompressedSize;
 
-      // read the compressed data
+      // Read the compressed data
       void *pCompressedData = malloc(DataSize);
       unsigned ActualDataSize = 0;
-      if (fseek(pDataFile->m_pFile,
-                pDataFile->m_DataStartOffset +
-                    pDataFile->m_Info.m_pDataOffsets[Index],
-                SEEK_SET) == 0)
-        ActualDataSize =
-            fread(pCompressedData, 1, DataSize, pDataFile->m_pFile);
+      if (fseek(pDataFile->m_pFile, pDataFile->m_DataStartOffset + pDataFile->m_Info.m_pDataOffsets[Index],
+                SEEK_SET) == 0) {
+        ActualDataSize = fread(pCompressedData, 1, DataSize, pDataFile->m_pFile);
+      }
       if (DataSize != ActualDataSize) {
         free(pCompressedData);
         pDataFile->m_ppDataPtrs[Index] = NULL;
@@ -213,12 +216,11 @@ void *get_data(CDatafile *pDataFile, int Index) {
         return NULL;
       }
 
-      // decompress the data
+      // Decompress the data
       pDataFile->m_ppDataPtrs[Index] = (char *)malloc(UncompressedSize);
       pDataFile->m_pDataSizes[Index] = UncompressedSize;
-      const int Result =
-          uncompress((Bytef *)pDataFile->m_ppDataPtrs[Index], &UncompressedSize,
-                     (Bytef *)pCompressedData, DataSize);
+      const int Result = uncompress((Bytef *)pDataFile->m_ppDataPtrs[Index], &UncompressedSize,
+                                    (Bytef *)pCompressedData, DataSize);
       free(pCompressedData);
       if (Result != Z_OK || UncompressedSize != OriginalUncompressedSize) {
         free(pDataFile->m_ppDataPtrs[Index]);
@@ -231,16 +233,14 @@ void *get_data(CDatafile *pDataFile, int Index) {
       SwapSize = UncompressedSize;
 #endif
     } else {
-      // load the data
-      pDataFile->m_ppDataPtrs[Index] = (char *)(malloc(DataSize));
+      // Load the data
+      pDataFile->m_ppDataPtrs[Index] = (char *)malloc(DataSize);
       pDataFile->m_pDataSizes[Index] = DataSize;
       unsigned ActualDataSize = 0;
-      if (fseek(pDataFile->m_pFile,
-                pDataFile->m_DataStartOffset +
-                    pDataFile->m_Info.m_pDataOffsets[Index],
-                SEEK_SET) == 0)
-        ActualDataSize = fread(pDataFile->m_ppDataPtrs[Index], DataSize, 1,
-                               pDataFile->m_pFile);
+      if (fseek(pDataFile->m_pFile, pDataFile->m_DataStartOffset + pDataFile->m_Info.m_pDataOffsets[Index],
+                SEEK_SET) == 0) {
+        ActualDataSize = fread(pDataFile->m_ppDataPtrs[Index], 1, DataSize, pDataFile->m_pFile);
+      }
       if (DataSize != ActualDataSize) {
         free(pDataFile->m_ppDataPtrs[Index]);
         pDataFile->m_ppDataPtrs[Index] = NULL;
@@ -248,6 +248,12 @@ void *get_data(CDatafile *pDataFile, int Index) {
         return NULL;
       }
     }
+
+#if defined(CONF_ARCH_ENDIAN_BIG)
+    if (SwapSize) {
+      swap_endian(pDataFile->m_ppDataPtrs[Index], sizeof(int), SwapSize / sizeof(int));
+    }
+#endif
   }
   return pDataFile->m_ppDataPtrs[Index];
 }
@@ -267,12 +273,12 @@ void get_type(CDatafile *pDataFile, int Type, int *pStart, int *pNum) {
     }
   }
 }
+
 int get_itemsize(CDatafile *pDataFile, int Index) {
   if (Index == pDataFile->m_Header.m_NumItems - 1)
-    return pDataFile->m_Header.m_ItemSize -
-           pDataFile->m_Info.m_pItemOffsets[Index] - sizeof(CDatafileItem);
-  return pDataFile->m_Info.m_pItemOffsets[Index + 1] -
-         pDataFile->m_Info.m_pItemOffsets[Index] - sizeof(CDatafileItem);
+    return pDataFile->m_Header.m_ItemSize - pDataFile->m_Info.m_pItemOffsets[Index] - sizeof(CDatafileItem);
+  return pDataFile->m_Info.m_pItemOffsets[Index + 1] - pDataFile->m_Info.m_pItemOffsets[Index] -
+         sizeof(CDatafileItem);
 }
 
 void *get_item(CDatafile *pDataFile, int Index, int *pType, int *pId) {
@@ -285,8 +291,7 @@ void *get_item(CDatafile *pDataFile, int Index, int *pType, int *pId) {
   }
 
   CDatafileItem *pItem =
-      (CDatafileItem *)(pDataFile->m_Info.m_pItemStart +
-                        pDataFile->m_Info.m_pItemOffsets[Index]);
+      (CDatafileItem *)(pDataFile->m_Info.m_pItemStart + pDataFile->m_Info.m_pItemOffsets[Index]);
 
   // remove sign extension
   const int Type = (pItem->m_TypeAndId >> 16) & 0xffff;
@@ -335,19 +340,15 @@ SMapData load_map(const char *pName) {
   Size += FileHeader.m_NumItemTypes * sizeof(CDatafileItemType);
   Size += (FileHeader.m_NumItems + FileHeader.m_NumRawData) * sizeof(int);
   if (FileHeader.m_Version == 4)
-    Size += FileHeader.m_NumRawData *
-            sizeof(int); // v4 has uncompressed data sizes as well
+    Size += FileHeader.m_NumRawData * sizeof(int); // v4 has uncompressed data sizes as well
   Size += FileHeader.m_ItemSize;
 
   unsigned AllocSize = Size;
-  AllocSize += sizeof(CDatafile); // add space for info structure
-  AllocSize +=
-      FileHeader.m_NumRawData * sizeof(void *); // add space for data pointers
-  AllocSize +=
-      FileHeader.m_NumRawData * sizeof(int); // add space for data sizes
-  if (Size > (((int64_t)1) << 31) || FileHeader.m_NumItemTypes < 0 ||
-      FileHeader.m_NumItems < 0 || FileHeader.m_NumRawData < 0 ||
-      FileHeader.m_ItemSize < 0) {
+  AllocSize += sizeof(CDatafile);                        // add space for info structure
+  AllocSize += FileHeader.m_NumRawData * sizeof(void *); // add space for data pointers
+  AllocSize += FileHeader.m_NumRawData * sizeof(int);    // add space for data sizes
+  if (Size > (((int64_t)1) << 31) || FileHeader.m_NumItemTypes < 0 || FileHeader.m_NumItems < 0 ||
+      FileHeader.m_NumRawData < 0 || FileHeader.m_ItemSize < 0) {
     fclose(pMapFile);
     printf("Invalid map signature\n");
     return MapData;
@@ -358,14 +359,11 @@ SMapData load_map(const char *pName) {
   pTmpDataFile->m_Header = FileHeader;
   pTmpDataFile->m_DataStartOffset = sizeof(CDatafileHeader) + Size;
   pTmpDataFile->m_ppDataPtrs = (char **)(pTmpDataFile + 1);
-  pTmpDataFile->m_pDataSizes =
-      (int *)(pTmpDataFile->m_ppDataPtrs + FileHeader.m_NumRawData);
-  pTmpDataFile->m_pData =
-      (char *)(pTmpDataFile->m_pDataSizes + FileHeader.m_NumRawData);
+  pTmpDataFile->m_pDataSizes = (int *)(pTmpDataFile->m_ppDataPtrs + FileHeader.m_NumRawData);
+  pTmpDataFile->m_pData = (char *)(pTmpDataFile->m_pDataSizes + FileHeader.m_NumRawData);
 
   // clear the data pointers and sizes
-  memset(pTmpDataFile->m_ppDataPtrs, 0,
-         FileHeader.m_NumRawData * sizeof(void *));
+  memset(pTmpDataFile->m_ppDataPtrs, 0, FileHeader.m_NumRawData * sizeof(void *));
   memset(pTmpDataFile->m_pDataSizes, 0, FileHeader.m_NumRawData * sizeof(int));
 
   unsigned ReadSize = fread(pTmpDataFile->m_pData, 1, Size, pMapFile);
@@ -376,11 +374,9 @@ SMapData load_map(const char *pName) {
     return MapData;
   }
 
-  pTmpDataFile->m_Info.m_pItemTypes =
-      (CDatafileItemType *)pTmpDataFile->m_pData;
+  pTmpDataFile->m_Info.m_pItemTypes = (CDatafileItemType *)pTmpDataFile->m_pData;
   pTmpDataFile->m_Info.m_pItemOffsets =
-      (int *)&pTmpDataFile->m_Info
-          .m_pItemTypes[pTmpDataFile->m_Header.m_NumItemTypes];
+      (int *)&pTmpDataFile->m_Info.m_pItemTypes[pTmpDataFile->m_Header.m_NumItemTypes];
   pTmpDataFile->m_Info.m_pDataOffsets =
       &pTmpDataFile->m_Info.m_pItemOffsets[pTmpDataFile->m_Header.m_NumItems];
   pTmpDataFile->m_Info.m_pDataSizes =
@@ -388,14 +384,11 @@ SMapData load_map(const char *pName) {
 
   if (FileHeader.m_Version == 4)
     pTmpDataFile->m_Info.m_pItemStart =
-        (char *)&pTmpDataFile->m_Info
-            .m_pDataSizes[pTmpDataFile->m_Header.m_NumRawData];
+        (char *)&pTmpDataFile->m_Info.m_pDataSizes[pTmpDataFile->m_Header.m_NumRawData];
   else
     pTmpDataFile->m_Info.m_pItemStart =
-        (char *)&pTmpDataFile->m_Info
-            .m_pDataOffsets[pTmpDataFile->m_Header.m_NumRawData];
-  pTmpDataFile->m_Info.m_pDataStart =
-      pTmpDataFile->m_Info.m_pItemStart + pTmpDataFile->m_Header.m_ItemSize;
+        (char *)&pTmpDataFile->m_Info.m_pDataOffsets[pTmpDataFile->m_Header.m_NumRawData];
+  pTmpDataFile->m_Info.m_pDataStart = pTmpDataFile->m_Info.m_pItemStart + pTmpDataFile->m_Header.m_ItemSize;
 
   // Init layers
   int GroupsNum;
@@ -408,8 +401,7 @@ SMapData load_map(const char *pName) {
   for (int g = 0; g < GroupsNum; ++g) {
     CMapItemGroup *pGroup = get_item(pTmpDataFile, GroupsStart + g, NULL, NULL);
     for (int l = 0; l < pGroup->m_NumLayers; l++) {
-      CMapItemLayer *pLayer = get_item(
-          pTmpDataFile, LayersStart + pGroup->m_StartLayer + l, NULL, NULL);
+      CMapItemLayer *pLayer = get_item(pTmpDataFile, LayersStart + pGroup->m_StartLayer + l, NULL, NULL);
       if (pLayer->m_Type != 2) // LAYERTYPE_TILES
         continue;
 
@@ -418,88 +410,100 @@ SMapData load_map(const char *pName) {
       int Size = pTilemap->m_Width * pTilemap->m_Height;
       if (pTilemap->m_Flags & TILESLAYERFLAG_GAME) {
         CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-        unsigned char *pNewData = malloc(Size);
-        unsigned char *pNewFlags = malloc(Size);
-        for (int i = 0; i < Size; ++i) {
-          pNewData[i] = pTiles[i].m_Index;
-          pNewFlags[i] = pTiles[i].m_Flags;
+        if (pTiles) {
+          unsigned char *pNewData = malloc(Size);
+          unsigned char *pNewFlags = malloc(Size);
+          for (int i = 0; i < Size; ++i) {
+            pNewData[i] = pTiles[i].m_Index;
+            pNewFlags[i] = pTiles[i].m_Flags;
+          }
+          MapData.m_GameLayer.m_pData = pNewData;
+          MapData.m_GameLayer.m_pFlags = pNewFlags;
+          MapData.m_Width = pTilemap->m_Width;
+          MapData.m_Height = pTilemap->m_Height;
         }
-        MapData.m_GameLayer.m_pData = pNewData;
-        MapData.m_GameLayer.m_pFlags = pNewFlags;
-        MapData.m_Width = pTilemap->m_Width;
-        MapData.m_Height = pTilemap->m_Height;
         continue;
       }
       if (pTilemap->m_Flags & TILESLAYERFLAG_FRONT) {
-        CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-        unsigned char *pNewData = malloc(Size);
-        unsigned char *pNewFlags = malloc(Size);
-        for (int i = 0; i < Size; ++i) {
-          pNewData[i] = pTiles[i].m_Index;
-          pNewFlags[i] = pTiles[i].m_Flags;
+        CTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Front);
+        if (pTiles) {
+          unsigned char *pNewData = malloc(Size);
+          unsigned char *pNewFlags = malloc(Size);
+          for (int i = 0; i < Size; ++i) {
+            pNewData[i] = pTiles[i].m_Index;
+            pNewFlags[i] = pTiles[i].m_Flags;
+          }
+          MapData.m_FrontLayer.m_pData = pNewData;
+          MapData.m_FrontLayer.m_pFlags = pNewFlags;
         }
-        MapData.m_FrontLayer.m_pData = pNewData;
-        MapData.m_FrontLayer.m_pFlags = pNewFlags;
         continue;
       }
       if (pTilemap->m_Flags & TILESLAYERFLAG_TELE) {
-        CTeleTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-        unsigned char *pNewType = malloc(Size);
-        unsigned char *pNewNumber = malloc(Size);
-        for (int i = 0; i < Size; ++i) {
-          pNewType[i] = pTiles[i].m_Type;
-          pNewNumber[i] = pTiles[i].m_Number;
+        CTeleTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Tele);
+        if (pTiles) {
+          unsigned char *pNewType = malloc(Size);
+          unsigned char *pNewNumber = malloc(Size);
+          for (int i = 0; i < Size; ++i) {
+            pNewType[i] = pTiles[i].m_Type;
+            pNewNumber[i] = pTiles[i].m_Number;
+          }
+          MapData.m_TeleLayer.m_pType = pNewType;
+          MapData.m_TeleLayer.m_pNumber = pNewNumber;
         }
-        MapData.m_TeleLayer.m_pType = pNewType;
-        MapData.m_TeleLayer.m_pNumber = pNewNumber;
         continue;
       }
       if (pTilemap->m_Flags & TILESLAYERFLAG_SPEEDUP) {
-        CSpeedupTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-        unsigned char *pNewForce = malloc(Size);
-        unsigned char *pNewMaxSpeed = malloc(Size);
-        unsigned char *pNewType = malloc(Size);
-        short *pNewAngle = malloc(Size);
-        for (int i = 0; i < Size; ++i) {
-          pNewForce[i] = pTiles[i].m_Force;
-          pNewMaxSpeed[i] = pTiles[i].m_MaxSpeed;
-          pNewType[i] = pTiles[i].m_Type;
-          pNewAngle[i] = pTiles[i].m_Angle;
+        CSpeedupTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Speedup);
+        if (pTiles) {
+          unsigned char *pNewForce = malloc(Size);
+          unsigned char *pNewMaxSpeed = malloc(Size);
+          unsigned char *pNewType = malloc(Size);
+          short *pNewAngle = malloc(Size);
+          for (int i = 0; i < Size; ++i) {
+            pNewForce[i] = pTiles[i].m_Force;
+            pNewMaxSpeed[i] = pTiles[i].m_MaxSpeed;
+            pNewType[i] = pTiles[i].m_Type;
+            pNewAngle[i] = pTiles[i].m_Angle;
+          }
+          MapData.m_SpeedupLayer.m_pForce = pNewForce;
+          MapData.m_SpeedupLayer.m_pMaxSpeed = pNewMaxSpeed;
+          MapData.m_SpeedupLayer.m_pType = pNewType;
+          MapData.m_SpeedupLayer.m_pAngle = pNewAngle;
         }
-        MapData.m_SpeedupLayer.m_pForce = pNewForce;
-        MapData.m_SpeedupLayer.m_pMaxSpeed = pNewMaxSpeed;
-        MapData.m_SpeedupLayer.m_pType = pNewType;
-        MapData.m_SpeedupLayer.m_pAngle = pNewAngle;
         continue;
       }
       if (pTilemap->m_Flags & TILESLAYERFLAG_SWITCH) {
-        CSwitchTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-        unsigned char *pNewType = malloc(Size);
-        unsigned char *pNewNumber = malloc(Size);
-        unsigned char *pNewFlags = malloc(Size);
-        unsigned char *pNewDelay = malloc(Size);
-        for (int i = 0; i < Size; ++i) {
-          pNewType[i] = pTiles[i].m_Type;
-          pNewNumber[i] = pTiles[i].m_Number;
-          pNewFlags[i] = pTiles[i].m_Flags;
-          pNewDelay[i] = pTiles[i].m_Delay;
+        CSwitchTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Switch);
+        if (pTiles) {
+          unsigned char *pNewType = malloc(Size);
+          unsigned char *pNewNumber = malloc(Size);
+          unsigned char *pNewFlags = malloc(Size);
+          unsigned char *pNewDelay = malloc(Size);
+          for (int i = 0; i < Size; ++i) {
+            pNewType[i] = pTiles[i].m_Type;
+            pNewNumber[i] = pTiles[i].m_Number;
+            pNewFlags[i] = pTiles[i].m_Flags;
+            pNewDelay[i] = pTiles[i].m_Delay;
+          }
+          MapData.m_SwitchLayer.m_pType = pNewType;
+          MapData.m_SwitchLayer.m_pNumber = pNewNumber;
+          MapData.m_SwitchLayer.m_pFlags = pNewFlags;
+          MapData.m_SwitchLayer.m_pDelay = pNewDelay;
         }
-        MapData.m_SwitchLayer.m_pType = pNewType;
-        MapData.m_SwitchLayer.m_pNumber = pNewNumber;
-        MapData.m_SwitchLayer.m_pFlags = pNewFlags;
-        MapData.m_SwitchLayer.m_pDelay = pNewDelay;
         continue;
       }
       if (pTilemap->m_Flags & TILESLAYERFLAG_TUNE) {
-        CTuneTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Data);
-        unsigned char *pNewType = malloc(Size);
-        unsigned char *pNewNumber = malloc(Size);
-        for (int i = 0; i < Size; ++i) {
-          pNewType[i] = pTiles[i].m_Type;
-          pNewNumber[i] = pTiles[i].m_Number;
+        CTuneTile *pTiles = get_data(pTmpDataFile, pTilemap->m_Tune);
+        if (pTiles) {
+          unsigned char *pNewType = malloc(Size);
+          unsigned char *pNewNumber = malloc(Size);
+          for (int i = 0; i < Size; ++i) {
+            pNewType[i] = pTiles[i].m_Type;
+            pNewNumber[i] = pTiles[i].m_Number;
+          }
+          MapData.m_TuneLayer.m_pType = pNewType;
+          MapData.m_TuneLayer.m_pNumber = pNewNumber;
         }
-        MapData.m_SwitchLayer.m_pType = pNewType;
-        MapData.m_SwitchLayer.m_pNumber = pNewNumber;
         continue;
       }
     }
@@ -510,8 +514,7 @@ SMapData load_map(const char *pName) {
   get_type(pTmpDataFile, MAPITEMTYPE_INFO, &InfoStart, &InfoNum);
   for (int i = InfoStart; i < InfoStart + InfoNum; i++) {
     int ItemId;
-    CMapItemInfoSettings *pItem =
-        (CMapItemInfoSettings *)get_item(pTmpDataFile, i, NULL, &ItemId);
+    CMapItemInfoSettings *pItem = (CMapItemInfoSettings *)get_item(pTmpDataFile, i, NULL, &ItemId);
     int ItemSize = get_itemsize(pTmpDataFile, i);
     if (!pItem || ItemId != 0)
       continue;
