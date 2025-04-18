@@ -1,7 +1,8 @@
-#ifndef MAP_LOADER_H
-#define MAP_LOADER_H
+#ifndef DDNET_MAP_LOADER_H
+#define DDNET_MAP_LOADER_H
 
 #include <stdbool.h>
+
 enum {
   ENTITY_NULL = 0,
   ENTITY_SPAWN,
@@ -15,7 +16,6 @@ enum {
   ENTITY_WEAPON_GRENADE,
   ENTITY_POWERUP_NINJA,
   ENTITY_WEAPON_LASER,
-  // DDRace - Main Lasers
   ENTITY_LASER_FAST_CCW,
   ENTITY_LASER_NORMAL_CCW,
   ENTITY_LASER_SLOW_CCW,
@@ -23,7 +23,6 @@ enum {
   ENTITY_LASER_SLOW_CW,
   ENTITY_LASER_NORMAL_CW,
   ENTITY_LASER_FAST_CW,
-  // DDRace - Laser Modifiers
   ENTITY_LASER_SHORT,
   ENTITY_LASER_MEDIUM,
   ENTITY_LASER_LONG,
@@ -33,33 +32,24 @@ enum {
   ENTITY_LASER_O_SLOW,
   ENTITY_LASER_O_NORMAL,
   ENTITY_LASER_O_FAST,
-  // DDRace - Plasma
   ENTITY_PLASMAE = 29,
   ENTITY_PLASMAF,
   ENTITY_PLASMA,
   ENTITY_PLASMAU,
-  // DDRace - Shotgun
   ENTITY_CRAZY_SHOTGUN_EX,
   ENTITY_CRAZY_SHOTGUN,
-  // DDNet - Removing specific weapon
   ENTITY_ARMOR_SHOTGUN,
   ENTITY_ARMOR_GRENADE,
   ENTITY_ARMOR_NINJA,
   ENTITY_ARMOR_LASER,
-  // DDRace - Draggers
   ENTITY_DRAGGER_WEAK = 42,
   ENTITY_DRAGGER_NORMAL,
   ENTITY_DRAGGER_STRONG,
-  // Draggers Behind Walls
   ENTITY_DRAGGER_WEAK_NW,
   ENTITY_DRAGGER_NORMAL_NW,
   ENTITY_DRAGGER_STRONG_NW,
-  // Doors
   ENTITY_DOOR = 49,
-  // End Of Lower Tiles
   NUM_ENTITIES,
-  // Start From Top Left
-  // Tile Controllers
   TILE_AIR = 0,
   TILE_SOLID,
   TILE_DEATH,
@@ -82,7 +72,6 @@ enum {
   TILE_HIT_DISABLE,
   TILE_SOLO_ENABLE,
   TILE_SOLO_DISABLE,
-  // Switches
   TILE_SWITCHTIMEDOPEN = 22,
   TILE_SWITCHTIMEDCLOSE,
   TILE_SWITCHOPEN,
@@ -144,8 +133,6 @@ enum {
   TILE_CREDITS_8 = 159,
   TILE_ENTITIES_OFF_1 = 190,
   TILE_ENTITIES_OFF_2,
-  // End of higher tiles
-  // Layers
   LAYER_GAME = 0,
   LAYER_FRONT,
   LAYER_TELE,
@@ -153,72 +140,67 @@ enum {
   LAYER_SWITCH,
   LAYER_TUNE,
   NUM_LAYERS,
-  // Flags
   TILEFLAG_XFLIP = 1,
   TILEFLAG_YFLIP = 2,
   TILEFLAG_OPAQUE = 4,
   TILEFLAG_ROTATE = 8,
-  // Rotation
   ROTATION_0 = 0,
   ROTATION_90 = TILEFLAG_ROTATE,
   ROTATION_180 = (TILEFLAG_XFLIP | TILEFLAG_YFLIP),
   ROTATION_270 = (TILEFLAG_XFLIP | TILEFLAG_YFLIP | TILEFLAG_ROTATE),
-
   ENTITY_OFFSET = 255 - 16 * 4,
 };
 
-typedef struct GameLayer {
-  unsigned char *m_pData;
-  unsigned char *m_pFlags;
-} SGameLayer;
+typedef struct game_layer_t {
+  unsigned char *data;
+  unsigned char *flags;
+} game_layer_t;
 
-typedef struct TeleLayer {
-  unsigned char *m_pNumber;
-  unsigned char *m_pType;
-} STeleLayer;
+typedef struct tele_layer_t {
+  unsigned char *number;
+  unsigned char *type;
+} tele_layer_t;
 
-typedef struct SpeedupLayer {
-  unsigned char *m_pForce;
-  unsigned char *m_pMaxSpeed;
-  unsigned char *m_pType;
-  short *m_pAngle;
-} SSpeedupLayer;
+typedef struct speedup_layer_t {
+  unsigned char *force;
+  unsigned char *max_speed;
+  unsigned char *type;
+  short *angle;
+} speedup_layer_t;
 
-typedef struct SwitchLayer {
-  unsigned char *m_pNumber;
-  unsigned char *m_pType;
-  unsigned char *m_pFlags;
-  unsigned char *m_pDelay;
-} SSwitchLayer;
+typedef struct switch_layer_t {
+  unsigned char *number;
+  unsigned char *type;
+  unsigned char *flags;
+  unsigned char *delay;
+} switch_layer_t;
 
-typedef struct DoorLayer {
-  unsigned char *m_pIndex;
-  unsigned char *m_pFlags;
-  int *m_pNumber;
-} SDoorLayer;
+typedef struct door_layer_t {
+  unsigned char *index;
+  unsigned char *flags;
+  int *number;
+} door_layer_t;
 
-typedef struct TuneLayer {
-  unsigned char *m_pNumber;
-  unsigned char *m_pType;
-} STuneLayer;
+typedef struct tune_layer_t {
+  unsigned char *number;
+  unsigned char *type;
+} tune_layer_t;
 
-typedef struct MapData {
-  SGameLayer m_GameLayer;
-  int m_Width;
-  int m_Height;
+typedef struct map_data_t {
+  game_layer_t game_layer;
+  int width;
+  int height;
+  game_layer_t front_layer;
+  tele_layer_t tele_layer;
+  speedup_layer_t speedup_layer;
+  switch_layer_t switch_layer;
+  door_layer_t door_layer;
+  tune_layer_t tune_layer;
+  int num_settings;
+  char **settings;
+} map_data_t;
 
-  SGameLayer m_FrontLayer;
-  STeleLayer m_TeleLayer;
-  SSpeedupLayer m_SpeedupLayer;
-  SSwitchLayer m_SwitchLayer;
-  SDoorLayer m_DoorLayer;
-  STuneLayer m_TuneLayer;
+map_data_t load_map(const char *name);
+void free_map_data(map_data_t *map_data);
 
-  int m_NumSettings;
-  char **m_ppSettings;
-} SMapData;
-
-SMapData load_map(const char *pName);
-void free_map_data(SMapData *pMapData);
-
-#endif // MAP_LOADER_H
+#endif

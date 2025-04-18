@@ -1,37 +1,52 @@
 # DDNet Map Loader
-This is a minimalistic C99-compatible map loader, inspired by the map loading code from [DDNet](https://github.com/ddnet/ddnet).
+
+A compact C99 ddnet map loader inspired by [DDNet](https://github.com/ddnet/ddnet).
 
 ## Features
-- Loads map files in a simple and isolated manner.
-- Minimal dependencies. (zlib, libc)
+
+- Loads game layers of map files simply and efficiently.
+- Minimal dependencies: zlib, libc.
 
 ## Usage
-To use the map loader in your project, simply include the `map_loader.h` file and compile the `map_loader.c` file along with your project.
+
+Include `ddnet_map_loader.h` and link against the library.
 
 ### Example
+
 ```c
-#include "map_loader.h"
+#include "ddnet_map_loader.h"
 #include <stdio.h>
 
 int main(void) {
-  SMapData map_data = load_map("/path/to/your/map.map");
+    map_data_t map_data = load_map("path/to/map.map");
+    if (!map_data.game_layer.data) return 1;
 
-  if (!map_data.m_GameLayer.m_pData)
-    return 1;
+    printf("Map loaded!\n");
+    printf("Tile at (24,10): %d\n", map_data.game_layer.data[10 * map_data.width + 24]);
 
-  printf("Map loaded successfully!\n");
+    for (int i = 0; i < map_data.num_settings; ++i)
+        printf("\t%s\n", map_data.settings[i]);
 
-  // Get tile at x: 24, y: 10
-  printf("Tile: %d\n",
-         map_data.m_GameLayer.m_pData[10 * map_data.m_Width + 24]);
-
-  // Print all map settings
-  printf("Settings: \n");
-  for (int i = 0; i < map_data.m_NumSettings; ++i)
-    printf("\t%s\n", map_data.m_ppSettings[i]);
-
-  free_map_data(&map_data);
-  return 0;
+    free_map_data(&map_data);
+    return 0;
 }
 ```
-`gcc example.c map_loader.c -lz -std=c99`
+Compile: `cc example.c -lddnet_map_loader -lz -std=c99`
+
+## Integration
+
+1. Add as a Git submodule:
+
+   ```bash
+   git submodule add https://github.com/Teero888/ddnet_maploader_c99 external/ddnet_map_loader
+   git submodule update --init
+   ```
+
+2. In your `CMakeLists.txt`:
+
+   ```cmake
+   add_subdirectory(external/ddnet_map_loader)
+   target_link_libraries(your_target PRIVATE ddnet_map_loader)
+   ```
+
+3. Build with CMake, ensuring zlib is installed.
