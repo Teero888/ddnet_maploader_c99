@@ -404,7 +404,7 @@ map_data_t load_map(const char *name) {
           unsigned char *new_force = malloc(size);
           unsigned char *new_max_speed = malloc(size);
           unsigned char *new_type = malloc(size);
-          short *new_angle = malloc(size);
+          short *new_angle = malloc(size * sizeof(short));
           for (int i = 0; i < size; ++i) {
             new_force[i] = tiles[i].force;
             new_max_speed[i] = tiles[i].max_speed;
