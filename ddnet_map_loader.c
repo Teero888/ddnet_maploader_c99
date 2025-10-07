@@ -298,7 +298,9 @@ map_data_t load_map(const char *name) {
   }
   map_data_t map_data = {0};
   datafile_header_t file_header;
-  fread(&file_header, sizeof(datafile_header_t), 1, map_file);
+  // avoid warning from clang
+  int _ = fread(&file_header, sizeof(datafile_header_t), 1, map_file);
+  (void)_;
   unsigned size = 0;
   size += file_header.num_item_types * sizeof(datafile_item_type_t);
   size += (file_header.num_items + file_header.num_raw_data) * sizeof(int);
