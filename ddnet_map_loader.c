@@ -5,6 +5,7 @@
 #include <string.h>
 #include <zlib.h>
 
+// All the typedefs for datafile structures are unchanged...
 typedef struct datafile_item_type_t {
   int type;
   int start;
@@ -38,7 +39,11 @@ typedef struct datafile_info_t {
 } datafile_info_t;
 
 typedef struct datafile_t {
+  // if file is NULL, it's a memory buffer
   FILE *file;
+  const unsigned char *memory_buffer;
+  size_t memory_buffer_size;
+
   datafile_info_t info;
   datafile_header_t header;
   int data_start_offset;
@@ -148,6 +153,8 @@ enum {
   MAPITEMTYPE_SOUND,
 };
 
+static map_data_t parse_map_datafile(datafile_t *data_file);
+
 int get_file_data_size(datafile_t *data_file, int index) {
   if (!data_file) {
     return 0;
@@ -179,26 +186,34 @@ void *get_data(datafile_t *data_file, int index) {
 #if defined(CONF_ARCH_ENDIAN_BIG)
     unsigned swap_size = data_size;
 #endif
-    if (data_file->header.version == 4) {
-      const unsigned original_uncompressed_size = data_file->info.data_sizes[index];
-      unsigned long uncompressed_size = original_uncompressed_size;
-      void *compressed_data = malloc(data_size);
-      unsigned actual_data_size = 0;
+
+    unsigned char *data_source = NULL;
+    if (data_file->file) { // Reading from file
+      data_source = malloc(data_size);
       if (fseek(data_file->file, data_file->data_start_offset + data_file->info.data_offsets[index],
-                SEEK_SET) == 0) {
-        actual_data_size = fread(compressed_data, 1, data_size, data_file->file);
-      }
-      if (data_size != actual_data_size) {
-        free(compressed_data);
+                SEEK_SET) != 0 ||
+          fread(data_source, 1, data_size, data_file->file) != data_size) {
+        free(data_source);
         data_file->data_ptrs[index] = NULL;
         data_file->data_sizes[index] = -1;
         return NULL;
       }
+    } else { // reading from memory
+      data_source = (unsigned char *)data_file->memory_buffer + data_file->data_start_offset +
+                    data_file->info.data_offsets[index];
+    }
+
+    if (data_file->header.version == 4) {
+      const unsigned original_uncompressed_size = data_file->info.data_sizes[index];
+      unsigned long uncompressed_size = original_uncompressed_size;
       data_file->data_ptrs[index] = (char *)malloc(uncompressed_size);
       data_file->data_sizes[index] = uncompressed_size;
       const int result = uncompress((Bytef *)data_file->data_ptrs[index], &uncompressed_size,
-                                    (Bytef *)compressed_data, data_size);
-      free(compressed_data);
+                                    (Bytef *)data_source, data_size);
+
+      if (data_file->file)
+        free(data_source); // free temp buffer if we read from file
+
       if (result != Z_OK || uncompressed_size != original_uncompressed_size) {
         free(data_file->data_ptrs[index]);
         data_file->data_ptrs[index] = NULL;
@@ -211,17 +226,9 @@ void *get_data(datafile_t *data_file, int index) {
     } else {
       data_file->data_ptrs[index] = (char *)malloc(data_size);
       data_file->data_sizes[index] = data_size;
-      unsigned actual_data_size = 0;
-      if (fseek(data_file->file, data_file->data_start_offset + data_file->info.data_offsets[index],
-                SEEK_SET) == 0) {
-        actual_data_size = fread(data_file->data_ptrs[index], 1, data_size, data_file->file);
-      }
-      if (data_size != actual_data_size) {
-        free(data_file->data_ptrs[index]);
-        data_file->data_ptrs[index] = NULL;
-        data_file->data_sizes[index] = -1;
-        return NULL;
-      }
+      memcpy(data_file->data_ptrs[index], data_source, data_size);
+      if (data_file->file)
+        free(data_source);
     }
 #if defined(CONF_ARCH_ENDIAN_BIG)
     if (swap_size) {
@@ -291,48 +298,84 @@ int get_data_size(datafile_t *data_file, int index) {
 }
 
 map_data_t load_map(const char *name) {
-  FILE *map_file = fopen(name, "r");
+  FILE *map_file = fopen(name, "rb");
   if (!map_file) {
     printf("Could not load map: %s\n", name);
     return (map_data_t){};
   }
+
+  fseek(map_file, 0, SEEK_END);
+  size_t file_size = ftell(map_file);
+  fseek(map_file, 0, SEEK_SET);
+
+  unsigned char *buffer = malloc(file_size);
+  if (!buffer) {
+    fclose(map_file);
+    return (map_data_t){};
+  }
+
+  if (fread(buffer, file_size, 1, map_file) != 1) {
+    free(buffer);
+    fclose(map_file);
+    return (map_data_t){};
+  }
+  fclose(map_file);
+
+  map_data_t map_data = load_map_from_memory(buffer, file_size);
+  map_data._map_file_data = buffer; // store the original buffer pointer
+  map_data._map_file_size = file_size;
+  // load_map_from_memory doesn't own the buffer, so we don't free it here.
+  // It will be freed later by free_map_data.
+  return map_data;
+}
+
+map_data_t load_map_from_memory(const unsigned char *buffer, size_t size) {
   map_data_t map_data = {0};
+  if (size < sizeof(datafile_header_t)) {
+    printf("Invalid map data: too small\n");
+    return map_data;
+  }
+
   datafile_header_t file_header;
-  // avoid warning from clang
-  int _ = fread(&file_header, sizeof(datafile_header_t), 1, map_file);
-  (void)_;
-  unsigned size = 0;
-  size += file_header.num_item_types * sizeof(datafile_item_type_t);
-  size += (file_header.num_items + file_header.num_raw_data) * sizeof(int);
+  memcpy(&file_header, buffer, sizeof(datafile_header_t));
+
+  unsigned info_size = 0;
+  info_size += file_header.num_item_types * sizeof(datafile_item_type_t);
+  info_size += (file_header.num_items + file_header.num_raw_data) * sizeof(int);
   if (file_header.version == 4)
-    size += file_header.num_raw_data * sizeof(int);
-  size += file_header.item_size;
-  unsigned alloc_size = size;
+    info_size += file_header.num_raw_data * sizeof(int);
+  info_size += file_header.item_size;
+
+  unsigned alloc_size = info_size;
   alloc_size += sizeof(datafile_t);
   alloc_size += file_header.num_raw_data * sizeof(void *);
   alloc_size += file_header.num_raw_data * sizeof(int);
-  if (size > (((int64_t)1) << 31) || file_header.num_item_types < 0 || file_header.num_items < 0 ||
+
+  if (info_size > size || file_header.num_item_types < 0 || file_header.num_items < 0 ||
       file_header.num_raw_data < 0 || file_header.item_size < 0) {
-    fclose(map_file);
     printf("Invalid map signature\n");
     return map_data;
   }
+
   datafile_t *tmp_data_file = (datafile_t *)malloc(alloc_size);
-  tmp_data_file->file = map_file;
+  if (!tmp_data_file) {
+    return map_data;
+  }
+
+  tmp_data_file->file = NULL; // Mark as memory-based
+  tmp_data_file->memory_buffer = buffer;
+  tmp_data_file->memory_buffer_size = size;
   tmp_data_file->header = file_header;
-  tmp_data_file->data_start_offset = sizeof(datafile_header_t) + size;
+  tmp_data_file->data_start_offset = sizeof(datafile_header_t) + info_size;
   tmp_data_file->data_ptrs = (char **)(tmp_data_file + 1);
   tmp_data_file->data_sizes = (int *)(tmp_data_file->data_ptrs + file_header.num_raw_data);
   tmp_data_file->data = (char *)(tmp_data_file->data_sizes + file_header.num_raw_data);
+
   memset(tmp_data_file->data_ptrs, 0, file_header.num_raw_data * sizeof(void *));
   memset(tmp_data_file->data_sizes, 0, file_header.num_raw_data * sizeof(int));
-  unsigned read_size = fread(tmp_data_file->data, 1, size, map_file);
-  if (read_size != size) {
-    free(tmp_data_file);
-    fclose(map_file);
-    printf("Could not load whole map. got %d expected %d\n", read_size, size);
-    return map_data;
-  }
+
+  memcpy(tmp_data_file->data, buffer + sizeof(datafile_header_t), info_size);
+
   tmp_data_file->info.item_types = (datafile_item_type_t *)tmp_data_file->data;
   tmp_data_file->info.item_offsets =
       (int *)&tmp_data_file->info.item_types[tmp_data_file->header.num_item_types];
@@ -345,6 +388,18 @@ map_data_t load_map(const char *name) {
     tmp_data_file->info.item_start =
         (char *)&tmp_data_file->info.data_offsets[tmp_data_file->header.num_raw_data];
   tmp_data_file->info.data_start = tmp_data_file->info.item_start + tmp_data_file->header.item_size;
+
+  map_data = parse_map_datafile(tmp_data_file);
+
+  for (int i = 0; i < tmp_data_file->header.num_raw_data; i++) {
+    free(tmp_data_file->data_ptrs[i]);
+  }
+  free(tmp_data_file);
+  return map_data;
+}
+
+static map_data_t parse_map_datafile(datafile_t *tmp_data_file) {
+  map_data_t map_data = {0};
   int groups_num, groups_start, layers_num, layers_start;
   get_type(tmp_data_file, MAPITEMTYPE_GROUP, &groups_start, &groups_num);
   get_type(tmp_data_file, MAPITEMTYPE_LAYER, &layers_start, &layers_num);
@@ -489,19 +544,16 @@ map_data_t load_map(const char *name) {
     }
     break;
   }
-  for (int i = 0; i < tmp_data_file->header.num_raw_data; i++) {
-    free(tmp_data_file->data_ptrs[i]);
-    tmp_data_file->data_ptrs[i] = NULL;
-    tmp_data_file->data_sizes[i] = 0;
-  }
-  fclose(map_file);
-  free(tmp_data_file);
   return map_data;
 }
 
 void free_map_data(map_data_t *map_data) {
   if (map_data == NULL)
     return;
+  // free the main map file buffer if it was loaded from a file
+  if (map_data->_map_file_data) {
+    free(map_data->_map_file_data);
+  }
   free(map_data->game_layer.data);
   free(map_data->game_layer.flags);
   free(map_data->front_layer.data);

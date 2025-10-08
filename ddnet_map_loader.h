@@ -2,6 +2,7 @@
 #define DDNET_MAP_LOADER_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 enum {
   ENTITY_NULL = 0,
@@ -198,9 +199,14 @@ typedef struct map_data_t {
   tune_layer_t tune_layer;
   int num_settings;
   char **settings;
+
+  // internal data
+  void *_map_file_data;
+  size_t _map_file_size;
 } map_data_t;
 
 map_data_t load_map(const char *name);
+map_data_t load_map_from_memory(const unsigned char *buffer, size_t size);
 void free_map_data(map_data_t *map_data);
 
 #endif
