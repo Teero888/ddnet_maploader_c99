@@ -322,14 +322,10 @@ map_data_t load_map(const char *name) {
   fclose(map_file);
 
   map_data_t map_data = load_map_from_memory(buffer, file_size);
-  map_data._map_file_data = buffer; // store the original buffer pointer
-  map_data._map_file_size = file_size;
-  // load_map_from_memory doesn't own the buffer, so we don't free it here.
-  // It will be freed later by free_map_data.
   return map_data;
 }
 
-map_data_t load_map_from_memory(const unsigned char *buffer, size_t size) {
+map_data_t load_map_from_memory(unsigned char *buffer, size_t size) {
   map_data_t map_data = {0};
   if (size < sizeof(datafile_header_t)) {
     printf("Invalid map data: too small\n");
@@ -395,6 +391,9 @@ map_data_t load_map_from_memory(const unsigned char *buffer, size_t size) {
     free(tmp_data_file->data_ptrs[i]);
   }
   free(tmp_data_file);
+
+  map_data._map_file_data = (void *)buffer; // store the original buffer pointer
+  map_data._map_file_size = size;
   return map_data;
 }
 

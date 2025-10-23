@@ -206,7 +206,7 @@ typedef struct map_data_t {
 } map_data_t;
 
 map_data_t load_map(const char *name);
-map_data_t load_map_from_memory(const unsigned char *buffer, size_t size);
+map_data_t load_map_from_memory(unsigned char *buffer, size_t size);
 void free_map_data(map_data_t *map_data);
 
 #endif
