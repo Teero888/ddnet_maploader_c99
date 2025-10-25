@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
 project(ddnet_map_loader C)
-option(BUILD_SHARED_LIBS "Build as shared library" ON)
 option(DDNET_MAP_LOADER_FETCH_ZLIB "Download zlib if no system zlib is found" ON)
 find_package(ZLIB QUIET)
 
@@ -42,6 +41,5 @@ set_target_properties(ddnet_map_loader PROPERTIES
 install(TARGETS ddnet_map_loader
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
 )
 install(FILES ddnet_map_loader.h DESTINATION include)
