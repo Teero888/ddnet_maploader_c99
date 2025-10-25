@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(ddnet_map_loader C)
-option(DDNET_MAP_LOADER_FETCH_ZLIB "Download zlib if no system zlib is found" ON)
+option(FETCH_ZLIB "Download zlib if no system zlib is found" ON)
+option(SHARED_LIB "Build ddnet_map_loader as a shared library" OFF)
+
 find_package(ZLIB QUIET)
 
 if(NOT ZLIB_FOUND)
-    if(NOT DDNET_MAP_LOADER_FETCH_ZLIB)
-        message(FATAL_ERROR "Zlib was not found and automatic fetching is disabled. Install zlib or enable DDNET_MAP_LOADER_FETCH_ZLIB.")
+    if(NOT FETCH_ZLIB)
+        message(FATAL_ERROR "Zlib was not found and automatic fetching is disabled. Install zlib or enable FETCH_ZLIB.")
     endif()
 
     include(FetchContent)
@@ -26,7 +28,14 @@ if(NOT ZLIB_FOUND)
         endif()
     endif()
 endif()
-add_library(ddnet_map_loader
+
+if(SHARED_LIB)
+    set(DDNET_MAP_LOADER_LIB_TYPE SHARED)
+else()
+    set(DDNET_MAP_LOADER_LIB_TYPE STATIC)
+endif()
+
+add_library(ddnet_map_loader ${DDNET_MAP_LOADER_LIB_TYPE}
     ddnet_map_loader.c
 )
 target_include_directories(ddnet_map_loader PUBLIC
