@@ -199,6 +199,7 @@ typedef struct map_data_t {
   tune_layer_t tune_layer;
   int num_settings;
   char **settings;
+  bool m_NoWeapons;
 
   // internal data
   void *_map_file_data;
