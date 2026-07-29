@@ -1,7 +1,6 @@
 #ifndef DDNET_MAP_LOADER_H
 #define DDNET_MAP_LOADER_H
 
-#include <stdbool.h>
 #include <stddef.h>
 
 enum {
@@ -199,7 +198,6 @@ typedef struct map_data_t {
   tune_layer_t tune_layer;
   int num_settings;
   char **settings;
-  bool m_NoWeapons;
 
   // internal data
   void *_map_file_data;

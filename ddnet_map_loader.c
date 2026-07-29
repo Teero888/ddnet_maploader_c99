@@ -310,22 +310,6 @@ int get_data_size(datafile_t *data_file, int index) {
   return size;
 }
 
-static bool map_name_has_no_weapons_suffix(const char *name) {
-  const char *base_name = name;
-  for (const char *cursor = name; *cursor; ++cursor) {
-    if (*cursor == '/' || *cursor == '\\')
-      base_name = cursor + 1;
-  }
-
-  size_t name_length = strlen(base_name);
-  if (name_length >= 4 && memcmp(base_name + name_length - 4, ".map", 4) == 0)
-    name_length -= 4;
-
-  static const char suffix[] = "no_wpns";
-  const size_t suffix_length = sizeof(suffix) - 1;
-  return name_length >= suffix_length && memcmp(base_name + name_length - suffix_length, suffix, suffix_length) == 0;
-}
-
 map_data_t load_map(const char *name) {
   FILE *map_file = fopen(name, "rb");
   if (!map_file) {
@@ -350,9 +334,7 @@ map_data_t load_map(const char *name) {
   }
   fclose(map_file);
 
-  map_data_t map_data = load_map_from_memory(buffer, file_size);
-  map_data.m_NoWeapons = map_name_has_no_weapons_suffix(name);
-  return map_data;
+  return load_map_from_memory(buffer, file_size);
 }
 
 map_data_t load_map_from_memory(unsigned char *buffer, size_t size) {
