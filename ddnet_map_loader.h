@@ -2,6 +2,7 @@
 #define DDNET_MAP_LOADER_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 enum {
   ENTITY_NULL = 0,
@@ -186,6 +187,51 @@ typedef struct tune_layer_t {
   unsigned char *type;
 } tune_layer_t;
 
+/* Visual map data, in file order. Fixed point coordinates/values use 22.10;
+ * envelope times and offsets are milliseconds. Owned by map_data_t. */
+typedef struct map_tile_t {
+  uint8_t index, flags, skip, reserved;
+} map_tile_t;
+
+typedef struct map_quad_t {
+  int32_t points[5][2];
+  int32_t colors[4][4];
+  int32_t texcoords[4][2];
+  int32_t pos_env, pos_env_offset, color_env, color_env_offset;
+} map_quad_t;
+
+typedef struct map_image_t {
+  int width, height, external;
+  char *name;
+  uint8_t *pixels; /* embedded RGBA8, NULL for external images */
+} map_image_t;
+
+typedef struct map_group_t {
+  int offset_x, offset_y, parallax_x, parallax_y;
+  int start_layer, num_layers;
+  int use_clipping, clip_x, clip_y, clip_w, clip_h;
+} map_group_t;
+
+typedef struct map_layer_t {
+  int type, flags; /* 2 = tiles, 3 = quads; flags bit 0 = detail */
+  int tile_flags; /* nonzero for physics layers */
+  int image; /* -1 = untextured */
+  int width, height;
+  int color[4], color_env, color_env_offset;
+  map_tile_t *tiles;
+  int num_quads;
+  map_quad_t *quads;
+} map_layer_t;
+
+typedef struct map_env_point_t {
+  int32_t time, curve, values[4];
+  int32_t in_dx[4], in_dy[4], out_dx[4], out_dy[4];
+} map_env_point_t;
+
+typedef struct map_envelope_t {
+  int channels, start_point, num_points, synchronized;
+} map_envelope_t;
+
 typedef struct map_data_t {
   game_layer_t game_layer;
   int width;
@@ -199,12 +245,22 @@ typedef struct map_data_t {
   int num_settings;
   char **settings;
 
+  int num_images, num_groups, num_layers, num_envelopes, num_env_points;
+  map_image_t *images;
+  map_group_t *groups;
+  map_layer_t *layers;
+  map_envelope_t *envelopes;
+  map_env_point_t *env_points;
+  int env_bezier;
+
   // internal data
   void *_map_file_data;
   size_t _map_file_size;
 } map_data_t;
 
 map_data_t load_map(const char *name);
+/* Takes ownership on success. On failure returns zero and leaves buffer owned
+ * by the caller. Success is indicated by game_layer.data != NULL. */
 map_data_t load_map_from_memory(unsigned char *buffer, size_t size);
 void free_map_data(map_data_t *map_data);
 
